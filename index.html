@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Health Assistant</title>
+  <meta name="description" content="Prototype AI Health Assistant — symptom checker, triage guidance, and care suggestions." />
+  <style>
+    :root{--bg:#f4f7fb;--card:#ffffff;--muted:#6b7280;--accent:#2563eb;--success:#059669}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#0f172a}
+    .wrap{max-width:980px;margin:32px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    h1{margin:0;font-size:20px}
+    .subtitle{color:var(--muted);font-size:13px}
+    .layout{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-top:18px}
+
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    .form-group{margin-bottom:12px}
+    label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+    input[type=text], textarea, select{width:100%;padding:10px;border:1px solid #e6eef8;border-radius:8px;font-size:14px}
+    textarea{min-height:100px;resize:vertical}
+    .row{display:flex;gap:8px}
+    .btn{background:var(--accent);color:white;padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:600}
+    .btn.secondary{background:transparent;border:1px solid #c7d2fe;color:#1e293b}
+    .hint{font-size:13px;color:var(--muted)}
+
+    /* Chat area */
+    .chat{height:420px;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .bubble{max-width:80%;padding:10px 12px;border-radius:12px;font-size:14px}
+    .user{align-self:flex-end;background:#eef2ff;border-radius:12px 12px 8px 12px}
+    .bot{align-self:flex-start;background:#f1f5f9;border-radius:12px 12px 12px 8px;color:#07203a}
+    .meta{font-size:12px;color:var(--muted);margin-top:8px}
+
+    .suggestions{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    .pill{padding:8px;border-radius:999px;border:1px dashed #e6eef8;font-size:13px;background:#fff}
+
+    footer{margin-top:16px;color:var(--muted);font-size:13px}
+
+    @media (max-width:880px){.layout{grid-template-columns:1fr;}.chat{height:300px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>AI Health Assistant (Prototype)</h1>
+        <div class="subtitle">Enter symptoms, get triage-level guidance and suggested next steps. Not a replacement for a doctor.</div>
+      </div>
+      <div class="hint">Prototype • No PHI stored • Use real API keys server-side</div>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <form id="symptomForm">
+          <div class="form-group">
+            <label for="name">Your name (optional)</label>
+            <input id="name" name="name" type="text" placeholder="e.g., Ananya" />
+          </div>
+
+          <div class="form-group">
+            <label for="age">Age</label>
+            <input id="age" name="age" type="text" inputmode="numeric" placeholder="e.g., 29" />
+          </div>
+
+          <div class="form-group">
+            <label for="sex">Sex</label>
+            <select id="sex" name="sex">
+              <option value="unspecified">Prefer not to say</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="symptoms">Describe your symptoms</label>
+            <textarea id="symptoms" name="symptoms" placeholder="e.g., fever for 2 days, sore throat, mild cough"></textarea>
+          </div>
+
+          <div class="form-group row">
+            <button type="submit" class="btn">Analyze</button>
+            <button type="button" id="clearBtn" class="btn secondary">Clear</button>
+          </div>
+
+          <div class="meta">Disclaimer: This is a prototype. For emergencies call local emergency services.</div>
+        </form>
+
+        <div id="resultArea" style="margin-top:14px"></div>
+      </section>
+
+      <aside class="card">
+        <h3 style="margin-top:0;margin-bottom:8px">Chat & Suggestions</h3>
+        <div id="chat" class="chat" aria-live="polite"></div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <input id="chatInput" placeholder="Ask follow-up (e.g., 'Should I see a doctor?')" style="flex:1;padding:10px;border-radius:8px;border:1px solid #e6eef8" />
+          <button id="sendBtn" class="btn">Send</button>
+        </div>
+
+        <div class="suggestions" id="quickActions">
+          <div class="pill">Check nearest clinic</div>
+          <div class="pill">View home remedies</div>
+          <div class="pill">Call emergency services</div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      Tips: You can replace the mock analyzer (client-side) with a server-side call to your preferred AI provider. Keep medical disclaimers visible.
+    </footer>
+  </div>
+
+  <script>
+    // Simple client-side prototype logic. Replace the mock logic below with a server-side AI call.
+    const chat = document.getElementById('chat');
+    const symptomForm = document.getElementById('symptomForm');
+    const resultArea = document.getElementById('resultArea');
+    const clearBtn = document.getElementById('clearBtn');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function addMessage(text, who='bot'){
+      const div = document.createElement('div');
+      div.className = 'bubble ' + (who==='user' ? 'user' : 'bot');
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function mockAnalyze({name, age, sex, symptoms}){
+      // Very naive heuristics for demo only
+      const s = symptoms.toLowerCase();
+      let severity = 'low';
+      if(/severe|unconscious|chest pain|shortness of breath|bleeding|collapse/.test(s)) severity='high';
+      else if(/fever|high fever|persistent|severe pain|vomit/.test(s)) severity='medium';
+
+      const suggestions = [];
+      if(severity==='high'){
+        suggestions.push('Seek immediate emergency care. Call local emergency services.');
+      } else if(severity==='medium'){
+        suggestions.push('Book a teleconsultation or visit a nearby clinic within 24 hours.');
+        suggestions.push('Rest, stay hydrated, monitor temperature and symptoms.');
+      } else {
+        suggestions.push('Home care: rest, fluids, OTC antipyretics for fever as per local guidance.');
+        suggestions.push('If symptoms persist beyond 72 hours, see a doctor.');
+      }
+
+      // Example suggested diagnoses (for demo only)
+      const possible = [];
+      if(/cough|sore throat/.test(s)) possible.push('Upper respiratory infection (common cold)');
+      if(/fever|body ache/.test(s)) possible.push('Viral infection (e.g., flu)');
+      if(/stomach|diarrhea|vomit/.test(s)) possible.push('Gastroenteritis');
+
+      return {severity, suggestions, possible};
+    }
+
+    symptomForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const data = {
+        name: document.getElementById('name').value.trim(),
+        age: document.getElementById('age').value.trim(),
+        sex: document.getElementById('sex').value,
+        symptoms: document.getElementById('symptoms').value.trim()
+      };
+      if(!data.symptoms){
+        resultArea.innerHTML = '<div class="meta" style="color:#b91c1c">Please describe your symptoms.</div>';
+        return;
+      }
+
+      addMessage('Analyzing symptoms...', 'user');
+
+      // Show temporary bot typing
+      const typing = document.createElement('div');
+      typing.className = 'bubble bot';
+      typing.textContent = 'Thinking...';
+      chat.appendChild(typing);
+      chat.scrollTop = chat.scrollHeight;
+
+      // Mock delay to emulate network/AI processing
+      await new Promise(r => setTimeout(r, 900));
+      chat.removeChild(typing);
+
+      // === Replace this block with a real API call to an AI model on your server ===
+      // Example (server-side):
+      // const resp = await fetch('/api/analyze', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+      // const analysis = await resp.json();
+      
+      const analysis = mockAnalyze(data);
+
+      // Present results
+      let html = '<div style="padding:10px;border-radius:8px;background:#fbfdff;border:1px solid #eef2ff">';
+      html += `<strong>Severity:</strong> ${analysis.severity.toUpperCase()}<br/>`;
+      if(analysis.possible.length){
+        html += `<strong>Possible:</strong> <ul style="margin:6px 0 0 18px">${analysis.possible.map(p=>'<li>'+p+'</li>').join('')}</ul>`;
+      }
+      html += `<div style="margin-top:8px"><strong>Suggestions:</strong><ul style="margin:6px 0 0 18px">${analysis.suggestions.map(s=>'<li>'+s+'</li>').join('')}</ul></div>`;
+      html += '</div>';
+      resultArea.innerHTML = html;
+
+      addMessage ;
+    });
+
+    clearBtn.addEventListener('click', ()=>{symptomForm.reset();
